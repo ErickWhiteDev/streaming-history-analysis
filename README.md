@@ -2,6 +2,12 @@
 
 This is a TypeScript web app for analyzing Spotify listening history.
 
+## Repository Status
+
+[![Deploy To GitHub Pages](https://github.com/erickwhitedev/streaming-history-analysis/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/erickwhitedev/streaming-history-analysis/actions/workflows/deploy-pages.yml)
+
+GitHub Pages URL: `https://erickwhitedev.github.io/streaming-history-analysis/`
+
 ## Features
 
 - Upload Spotify export `.zip` containing `Streaming_History_Audio_*.json`
