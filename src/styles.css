@@ -1,0 +1,236 @@
+:root {
+  --window-bg: #1e1e2e;
+  --window-fg: #e0e0e0;
+  --panel-bg: #1f2937;
+  --plot-card-bg: #0f172a;
+  --text-muted: #94a3b8;
+  --text-label: #cbd5e1;
+  --control-bg: #334155;
+  --control-hover: #475569;
+  --field-bg: #0f172a;
+  --button-text: #f8fafc;
+  --save-normal: #d1d5db;
+  --save-hover: #f3f4f6;
+  --save-text: #111827;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  font-family: "Segoe UI", sans-serif;
+  background: var(--window-bg);
+  color: var(--window-fg);
+}
+
+.startup-shell {
+  min-height: 100%;
+  display: grid;
+  place-items: center;
+  padding: 16px;
+}
+
+.startup-card {
+  width: min(940px, 100%);
+}
+
+.app-shell {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.controls-row {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+  flex: 0 0 auto;
+}
+
+.panel {
+  border-radius: 16px;
+  background: var(--panel-bg);
+  padding: 14px;
+}
+
+.panel h1,
+.panel h2 {
+  margin: 0 0 8px;
+  font-size: 20px;
+}
+
+.panel p,
+.helper,
+.status {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.status {
+  margin-top: 10px;
+}
+
+.filters-panel {
+  width: 760px;
+  min-width: 760px;
+  flex: 0 0 760px;
+}
+
+.button-panel {
+  width: 560px;
+  min-width: 560px;
+  flex: 0 0 560px;
+}
+
+.filters-grid {
+  display: grid;
+  grid-template-columns: 140px minmax(180px, 1fr);
+  gap: 10px;
+  align-items: center;
+  margin-top: 12px;
+}
+
+.filters-grid label {
+  color: var(--text-label);
+  font-weight: 700;
+}
+
+input[type='number'],
+select {
+  background: var(--field-bg);
+  color: var(--window-fg);
+  border: none;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 16px;
+  font-weight: 700;
+  width: 100%;
+}
+
+select {
+  max-height: 320px;
+}
+
+.helper {
+  margin-top: 8px;
+}
+
+.button-grid {
+  margin-top: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(240px, 1fr));
+  gap: 10px;
+}
+
+.rounded-button,
+.file-picker {
+  appearance: none;
+  border: none;
+  border-radius: 14px;
+  background: var(--control-bg);
+  color: var(--button-text);
+  font-weight: 700;
+  font-size: 16px;
+  padding: 12px 16px;
+  cursor: pointer;
+  text-align: center;
+}
+
+.rounded-button:hover,
+.file-picker:hover {
+  background: var(--control-hover);
+}
+
+.file-picker {
+  display: inline-block;
+  margin-top: 8px;
+}
+
+.file-picker input {
+  display: none;
+}
+
+.plot-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--plot-card-bg);
+  position: relative;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+
+.plot-panel > div {
+  width: 100%;
+  height: 100%;
+}
+
+.plot-panel .js-plotly-plot,
+.plot-panel .plot-container {
+  width: 100% !important;
+  height: 100% !important;
+  margin: 0 auto;
+}
+
+.empty-state {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  color: var(--text-muted);
+  font-size: 16px;
+}
+
+@media (max-width: 1500px) {
+  .app-shell {
+    height: auto;
+    min-height: 100%;
+    overflow-y: auto;
+  }
+
+  .controls-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filters-panel,
+  .button-panel {
+    width: 100%;
+    min-width: 0;
+    flex: 0 0 auto;
+  }
+
+  .button-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .plot-panel {
+    min-height: 0;
+    flex: 0 0 auto;
+    aspect-ratio: 16 / 10;
+  }
+
+  .plot-panel-mobile-insights {
+    aspect-ratio: 6 / 5;
+  }
+}
+
+@media (max-width: 430px) {
+  .plot-panel {
+    aspect-ratio: 6 / 5;
+  }
+
+  .plot-panel-mobile-insights {
+    aspect-ratio: 7 / 6;
+  }
+}
