@@ -18,6 +18,7 @@ export type StreamRecord = {
 
 export type TimeframeRecord = StreamRecord & {
   localDate: Date;
+  localDateKey: string;
   yearLocal: number;
   hourLocal: number;
   weekdayLocal: string;
@@ -37,13 +38,20 @@ export type ChartSpec = {
 export type ChartKey =
   | 'topSongsTime'
   | 'topSongsCount'
+  | 'topSongsFrequency'
   | 'topArtistsTime'
   | 'topArtistsCount'
+  | 'topArtistsFrequency'
   | 'topAlbumsTime'
   | 'topAlbumsCount'
+  | 'topAlbumsFrequency'
   | 'songsCumulative'
   | 'artistsCumulative'
+  | 'albumsCumulative'
+  | 'songsFrequency'
+  | 'artistsFrequency'
+  | 'albumsFrequency'
   | 'listeningByHour'
   | 'listeningByWeekday'
-  | 'skipRateByYear'
+  | 'overallListeningFrequency'
   | 'insightsOverview';

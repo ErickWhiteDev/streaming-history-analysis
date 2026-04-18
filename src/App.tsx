@@ -11,19 +11,211 @@ type PlotInstance = {
 };
 
 const CHART_KEYS: ChartKey[] = [
-  'topSongsTime',
   'topSongsCount',
-  'topArtistsTime',
+  'topSongsFrequency',
+  'topSongsTime',
+
   'topArtistsCount',
-  'topAlbumsTime',
+  'topArtistsFrequency',
+  'topArtistsTime',
+
   'topAlbumsCount',
+  'topAlbumsFrequency',
+  'topAlbumsTime',
+
   'songsCumulative',
   'artistsCumulative',
+  'albumsCumulative',
+
+  'songsFrequency',
+  'artistsFrequency',
+  'albumsFrequency',
+
+  'overallListeningFrequency',
   'listeningByHour',
   'listeningByWeekday',
-  'skipRateByYear',
+
   'insightsOverview',
 ];
+
+const FREQUENCY_WINDOWS = [
+  { value: '1d', label: '1 Day', days: 1, unitLabel: 'Day' },
+  { value: '3d', label: '3 Days', days: 3, unitLabel: '3 Days' },
+  { value: '1w', label: '1 Week', days: 7, unitLabel: 'Week' },
+  { value: '2w', label: '2 Weeks', days: 14, unitLabel: '2 Weeks' },
+  { value: '1m', label: '1 Month (30 Days)', days: 30, unitLabel: 'Month' },
+];
+
+const isoToday = (): string => new Date().toISOString().slice(0, 10);
+const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September','October', 'November', 'December'];
+
+type DateParts = {
+  year: number;
+  month: number;
+  day: number;
+};
+
+const parseIsoDate = (value: string): DateParts => {
+  const [year, month, day] = value.split('-').map(Number);
+  return { year, month, day };
+};
+
+const pad2 = (value: number): string => String(value).padStart(2, '0');
+
+const daysInMonth = (year: number, month: number): number => {
+  return new Date(Date.UTC(year, month, 0)).getUTCDate();
+};
+
+const toDateKey = (parts: DateParts): number => parts.year * 10_000 + parts.month * 100 + parts.day;
+
+const clampPartsToRange = (parts: DateParts, minIso: string, maxIso: string): DateParts => {
+  const minParts = parseIsoDate(minIso);
+  const maxParts = parseIsoDate(maxIso);
+
+  const dayCap = daysInMonth(parts.year, parts.month);
+  const normalized = { ...parts, day: Math.min(parts.day, dayCap) };
+
+  const currentKey = toDateKey(normalized);
+  const minKey = toDateKey(minParts);
+  const maxKey = toDateKey(maxParts);
+
+  if (currentKey < minKey) return minParts;
+  if (currentKey > maxKey) return maxParts;
+  return normalized;
+};
+
+const toIsoDate = (parts: DateParts): string => `${parts.year}-${pad2(parts.month)}-${pad2(parts.day)}`;
+
+const computeDefaultDateRange = (minDate: string, maxDate: string): { start: string; end: string } => {
+  const minYear = Number(minDate.slice(0, 4));
+  const maxYear = Number(maxDate.slice(0, 4));
+
+  for (let year = maxYear; year >= minYear; year -= 1) {
+    const yearStart = `${year}-01-01`;
+    const yearEnd = `${year}-12-31`;
+    if (minDate <= yearStart && maxDate >= yearEnd) {
+      return { start: yearStart, end: yearEnd };
+    }
+  }
+
+  const firstYear = Number(minDate.slice(0, 4));
+  const endOfFirstYear = `${firstYear}-12-31`;
+  if (endOfFirstYear <= maxDate) {
+    return { start: minDate, end: endOfFirstYear };
+  }
+
+  return { start: minDate, end: maxDate };
+};
+
+type DateScrollPickerProps = {
+  value: string;
+  hardMin: string;
+  hardMax: string;
+  softMin?: string;
+  softMax?: string;
+  onChange: (next: string) => void;
+};
+
+const DateScrollPicker = ({ value, hardMin, hardMax, softMin, softMax, onChange }: DateScrollPickerProps) => {
+  const parts = useMemo(() => parseIsoDate(value), [value]);
+  const minParts = useMemo(() => parseIsoDate(hardMin), [hardMin]);
+  const maxParts = useMemo(() => parseIsoDate(hardMax), [hardMax]);
+
+  const hardMinKey = useMemo(() => toDateKey(minParts), [minParts]);
+  const hardMaxKey = useMemo(() => toDateKey(maxParts), [maxParts]);
+  const softMinKey = useMemo(() => (softMin ? toDateKey(parseIsoDate(softMin)) : hardMinKey), [softMin, hardMinKey]);
+  const softMaxKey = useMemo(() => (softMax ? toDateKey(parseIsoDate(softMax)) : hardMaxKey), [softMax, hardMaxKey]);
+
+  const inSoftRange = (dateKey: number) => dateKey >= softMinKey && dateKey <= softMaxKey;
+  const intersectsSoftRange = (startKey: number, endKey: number) => {
+    return Math.max(startKey, softMinKey) <= Math.min(endKey, softMaxKey);
+  };
+
+  const yearOptions = useMemo(() => {
+    const options: number[] = [];
+    for (let year = minParts.year; year <= maxParts.year; year += 1) {
+      options.push(year);
+    }
+    return options;
+  }, [minParts.year, maxParts.year]);
+
+  const monthMin = parts.year === minParts.year ? minParts.month : 1;
+  const monthMax = parts.year === maxParts.year ? maxParts.month : 12;
+
+  const monthOptions = useMemo(() => {
+    const options: number[] = [];
+    for (let month = monthMin; month <= monthMax; month += 1) {
+      options.push(month);
+    }
+    return options;
+  }, [monthMin, monthMax]);
+
+  const absoluteDayMax = daysInMonth(parts.year, parts.month);
+  const dayMin = parts.year === minParts.year && parts.month === minParts.month ? minParts.day : 1;
+  const dayMax = parts.year === maxParts.year && parts.month === maxParts.month ? maxParts.day : absoluteDayMax;
+
+  const dayOptions = useMemo(() => {
+    const options: number[] = [];
+    for (let day = dayMin; day <= dayMax; day += 1) {
+      options.push(day);
+    }
+    return options;
+  }, [dayMin, dayMax]);
+
+  const update = (nextParts: DateParts) => {
+    const hardBounded = clampPartsToRange(nextParts, hardMin, hardMax);
+    const effectiveMin = softMin && softMin > hardMin ? softMin : hardMin;
+    const effectiveMax = softMax && softMax < hardMax ? softMax : hardMax;
+    const fullyBounded = clampPartsToRange(hardBounded, effectiveMin, effectiveMax);
+    onChange(toIsoDate(fullyBounded));
+  };
+
+  return (
+    <div className="date-scroll-picker" aria-label="Date selector">
+      <select value={parts.month} onChange={(e) => update({ ...parts, month: Number(e.target.value) })}>
+        {monthOptions.map((month) => (
+          <option
+            key={month}
+            value={month}
+            disabled={(() => {
+              const monthStartKey = toDateKey({ year: parts.year, month, day: 1 });
+              const monthEndKey = toDateKey({ year: parts.year, month, day: daysInMonth(parts.year, month) });
+              const boundedStart = Math.max(monthStartKey, hardMinKey);
+              const boundedEnd = Math.min(monthEndKey, hardMaxKey);
+              return !intersectsSoftRange(boundedStart, boundedEnd);
+            })()}
+          >
+            {MONTH_NAMES[month - 1]}
+          </option>
+        ))}
+      </select>
+      <select value={parts.day} onChange={(e) => update({ ...parts, day: Number(e.target.value) })}>
+        {dayOptions.map((day) => (
+          <option key={day} value={day} disabled={!inSoftRange(toDateKey({ year: parts.year, month: parts.month, day }))}>
+            {day}
+          </option>
+        ))}
+      </select>
+      <select value={parts.year} onChange={(e) => update({ ...parts, year: Number(e.target.value) })}>
+        {yearOptions.map((year) => (
+          <option
+            key={year}
+            value={year}
+            disabled={(() => {
+              const yearStartKey = toDateKey({ year, month: 1, day: 1 });
+              const yearEndKey = toDateKey({ year, month: 12, day: 31 });
+              const boundedStart = Math.max(yearStartKey, hardMinKey);
+              const boundedEnd = Math.min(yearEndKey, hardMaxKey);
+              return !intersectsSoftRange(boundedStart, boundedEnd);
+            })()}
+          >
+            {year}
+          </option>
+        ))}
+      </select>
+    </div>
+  );
+};
 
 const App = () => {
   const timezoneOptions = useMemo(() => buildTimezoneOptions(), []);
@@ -31,9 +223,10 @@ const App = () => {
   const [status, setStatus] = useState('Select your Spotify data ZIP to continue.');
   const [fileName, setFileName] = useState('');
 
-  const [yearStart, setYearStart] = useState(2023);
-  const [yearEnd, setYearEnd] = useState(2026);
+  const [startDate, setStartDate] = useState(isoToday());
+  const [endDate, setEndDate] = useState(isoToday());
   const [topN, setTopN] = useState(5);
+  const [frequencyWindow, setFrequencyWindow] = useState(FREQUENCY_WINDOWS[2].value);
   const [timezone, setTimezone] = useState(timezoneOptions[0]?.value ?? 'UTC');
 
   const [activeChartKey, setActiveChartKey] = useState<ChartKey | null>(null);
@@ -93,23 +286,29 @@ const App = () => {
     return buildTimeframe(records, timezone);
   }, [records, timezone]);
 
-  const yearBounds = useMemo(() => {
+  const dateBounds = useMemo(() => {
     if (!timeframe.length) {
-      return { min: yearStart, max: yearEnd };
+      return { min: startDate, max: endDate };
     }
 
-    let minYear = timeframe[0].yearLocal;
-    let maxYear = timeframe[0].yearLocal;
+    let minDate = timeframe[0].localDateKey;
+    let maxDate = timeframe[0].localDateKey;
     for (const row of timeframe) {
-      if (row.yearLocal < minYear) minYear = row.yearLocal;
-      if (row.yearLocal > maxYear) maxYear = row.yearLocal;
+      if (row.localDateKey < minDate) minDate = row.localDateKey;
+      if (row.localDateKey > maxDate) maxDate = row.localDateKey;
     }
-    return { min: minYear, max: maxYear };
-  }, [timeframe, yearStart, yearEnd]);
+    return { min: minDate, max: maxDate };
+  }, [timeframe, startDate, endDate]);
 
-  const clampYear = (value: number): number => {
-    return Math.min(Math.max(value, yearBounds.min), yearBounds.max);
+  const clampDate = (value: string): string => {
+    if (value < dateBounds.min) return dateBounds.min;
+    if (value > dateBounds.max) return dateBounds.max;
+    return value;
   };
+
+  const frequencyWindowSpec = useMemo(() => {
+    return FREQUENCY_WINDOWS.find((option) => option.value === frequencyWindow) ?? FREQUENCY_WINDOWS[2];
+  }, [frequencyWindow]);
 
   const onPickZip = async (event: ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -118,6 +317,21 @@ const App = () => {
     setStatus('Loading ZIP data...');
     try {
       const loaded = await loadSpotifyZip(file);
+      const loadedTimeframe = buildTimeframe(loaded, timezone);
+
+      let minDate = loadedTimeframe[0]?.localDateKey;
+      let maxDate = loadedTimeframe[0]?.localDateKey;
+      for (const row of loadedTimeframe) {
+        if (minDate && row.localDateKey < minDate) minDate = row.localDateKey;
+        if (maxDate && row.localDateKey > maxDate) maxDate = row.localDateKey;
+      }
+
+      if (minDate && maxDate) {
+        const nextRange = computeDefaultDateRange(minDate, maxDate);
+        setStartDate(nextRange.start);
+        setEndDate(nextRange.end);
+      }
+
       setRecords(loaded);
       setFileName(file.name);
       setStatus(`Loaded ${loaded.length.toLocaleString()} streams from ${file.name}`);
@@ -131,48 +345,84 @@ const App = () => {
   };
 
   const renderChart = (key: ChartKey) => {
-    const start = Math.min(yearStart, yearEnd);
-    const end = Math.max(yearStart, yearEnd);
+    const start = startDate <= endDate ? startDate : endDate;
+    const end = startDate <= endDate ? endDate : startDate;
     const depth = Math.max(1, Math.min(50, topN));
-    const spec = buildChart(key, timeframe, start, end, depth, isMobileLayout, isNarrowMobileLayout);
+    const spec = buildChart(
+      key,
+      timeframe,
+      start,
+      end,
+      depth,
+      frequencyWindowSpec.days,
+      frequencyWindowSpec.unitLabel,
+      isMobileLayout,
+      isNarrowMobileLayout,
+    );
     setActiveChartKey(key);
     setActivePlot({ data: spec.data, layout: spec.layout });
   };
 
-  const onChangeYearStart = (value: number) => {
-    if (Number.isNaN(value)) return;
-    const nextStart = clampYear(value);
-    setYearStart(nextStart);
-    setYearEnd((prev) => Math.max(clampYear(prev), nextStart));
+  const onChangeStartDate = (value: string) => {
+    if (!value) return;
+    const nextStart = clampDate(value);
+    setStartDate(nextStart);
+    setEndDate((prev) => {
+      const boundedPrev = clampDate(prev);
+      return boundedPrev < nextStart ? nextStart : boundedPrev;
+    });
   };
 
-  const onChangeYearEnd = (value: number) => {
-    if (Number.isNaN(value)) return;
-    const nextEnd = clampYear(value);
-    setYearEnd(nextEnd);
-    setYearStart((prev) => Math.min(clampYear(prev), nextEnd));
+  const onChangeEndDate = (value: string) => {
+    if (!value) return;
+    const nextEnd = clampDate(value);
+    setEndDate(nextEnd);
+    setStartDate((prev) => {
+      const boundedPrev = clampDate(prev);
+      return boundedPrev > nextEnd ? nextEnd : boundedPrev;
+    });
   };
 
   useEffect(() => {
     if (!timeframe.length) return;
 
-    const boundedStart = clampYear(yearStart);
-    const boundedEnd = clampYear(yearEnd);
-    const normalizedStart = Math.min(boundedStart, boundedEnd);
-    const normalizedEnd = Math.max(boundedStart, boundedEnd);
+    const boundedStart = clampDate(startDate);
+    const boundedEnd = clampDate(endDate);
+    const normalizedStart = boundedStart <= boundedEnd ? boundedStart : boundedEnd;
+    const normalizedEnd = boundedStart <= boundedEnd ? boundedEnd : boundedStart;
 
-    if (normalizedStart !== yearStart) setYearStart(normalizedStart);
-    if (normalizedEnd !== yearEnd) setYearEnd(normalizedEnd);
-  }, [timeframe, yearBounds.min, yearBounds.max, yearStart, yearEnd]);
+    if (normalizedStart !== startDate) setStartDate(normalizedStart);
+    if (normalizedEnd !== endDate) setEndDate(normalizedEnd);
+  }, [timeframe, dateBounds.min, dateBounds.max, startDate, endDate]);
 
   useEffect(() => {
     if (!activeChartKey) return;
-    const start = Math.min(yearStart, yearEnd);
-    const end = Math.max(yearStart, yearEnd);
+    const start = startDate <= endDate ? startDate : endDate;
+    const end = startDate <= endDate ? endDate : startDate;
     const depth = Math.max(1, Math.min(50, topN));
-    const spec = buildChart(activeChartKey, timeframe, start, end, depth, isMobileLayout, isNarrowMobileLayout);
+    const spec = buildChart(
+      activeChartKey,
+      timeframe,
+      start,
+      end,
+      depth,
+      frequencyWindowSpec.days,
+      frequencyWindowSpec.unitLabel,
+      isMobileLayout,
+      isNarrowMobileLayout,
+    );
     setActivePlot({ data: spec.data, layout: spec.layout });
-  }, [activeChartKey, timeframe, yearStart, yearEnd, topN, isMobileLayout, isNarrowMobileLayout]);
+  }, [
+    activeChartKey,
+    timeframe,
+    startDate,
+    endDate,
+    topN,
+    frequencyWindowSpec.days,
+    frequencyWindowSpec.unitLabel,
+    isMobileLayout,
+    isNarrowMobileLayout,
+  ]);
 
   if (!records) {
     return (
@@ -195,26 +445,34 @@ const App = () => {
       <div className="controls-row">
         <section className="panel filters-panel">
           <h2>Analysis Filters</h2>
-          <p>Choose year range and statistic depth</p>
+          <p>Choose date range and statistic depth</p>
           <div className="filters-grid">
-            <label>Start</label>
-            <input
-              type="number"
-              value={yearStart}
-              min={yearBounds.min}
-              max={yearEnd}
-              onChange={(e) => onChangeYearStart(Number(e.target.value))}
+            <label>Start Date</label>
+            <DateScrollPicker
+              value={startDate}
+              hardMin={dateBounds.min}
+              hardMax={dateBounds.max}
+              softMax={endDate}
+              onChange={onChangeStartDate}
             />
-            <label>End</label>
-            <input
-              type="number"
-              value={yearEnd}
-              min={yearStart}
-              max={yearBounds.max}
-              onChange={(e) => onChangeYearEnd(Number(e.target.value))}
+            <label>End Date</label>
+            <DateScrollPicker
+              value={endDate}
+              hardMin={dateBounds.min}
+              hardMax={dateBounds.max}
+              softMin={startDate}
+              onChange={onChangeEndDate}
             />
             <label>Statistic Depth</label>
             <input type="number" value={topN} min={1} max={50} onChange={(e) => setTopN(Number(e.target.value))} />
+            <label>Frequency Window</label>
+            <select value={frequencyWindow} onChange={(e) => setFrequencyWindow(e.target.value)}>
+              {FREQUENCY_WINDOWS.map((option) => (
+                <option value={option.value} key={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
             <label>Timezone</label>
             <select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
               {timezoneOptions.map((option) => (
@@ -226,13 +484,18 @@ const App = () => {
           </div>
           <div className="helper">Loaded file: {fileName}</div>
           <div className="helper">Listening hours, weekday, year, and cumulative timestamps use the selected timezone.</div>
+          <div className="helper">Frequency charts use a centered sliding window with the selected frequency window size.</div>
         </section>
 
         <section className="panel button-panel">
           <h2>Select Statistic</h2>
           <div className="button-grid">
             {CHART_KEYS.map((key) => (
-              <button key={key} className="rounded-button" onClick={() => renderChart(key)}>
+              <button
+                key={key}
+                className={`rounded-button${key === 'insightsOverview' ? ' rounded-button-emphasis insights-button' : ''}`}
+                onClick={() => renderChart(key)}
+              >
                 {labelForChart(key)}
               </button>
             ))}

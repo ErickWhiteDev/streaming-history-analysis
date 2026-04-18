@@ -5,17 +5,24 @@ import {
 } from './types';
 import { THEME } from './theme';
 import {
+  albumsFrequencySeries,
+  artistsFrequencySeries,
+  cumulativeAlbums,
   cumulativeArtists,
   cumulativeSongs,
-  filterByYear,
+  filterByDateRange,
   listeningByHour,
   listeningByWeekday,
-  skipRateByYear,
+  overallListeningFrequency,
+  songsFrequencySeries,
   topAlbumsByCount,
+  topAlbumsByFrequency,
   topAlbumsByTime,
   topArtistsByCount,
+  topArtistsByFrequency,
   topArtistsByTime,
   topSongsByCount,
+  topSongsByFrequency,
   topSongsByTime,
 } from './analytics';
 
@@ -64,21 +71,25 @@ const narrowBarLabelStyle = (textColor: string) => ({
 export const buildChart = (
   key: ChartKey,
   timeframe: TimeframeRecord[],
-  yearStart: number,
-  yearEnd: number,
+  startDate: string,
+  endDate: string,
   topN: number,
+  frequencyWindowDays: number,
+  frequencyWindowLabel: string,
   isMobileLayout = false,
   isNarrowMobileLayout = false,
 ): ChartSpec => {
-  const records = filterByYear(timeframe, yearStart, yearEnd);
+  const records = filterByDateRange(timeframe, startDate, endDate);
   const shouldOverlayCategoryLabels = isMobileLayout;
+  const rangeLabel = `${startDate} to ${endDate}`;
+  const windowAxisTitle = `Listens per ${frequencyWindowLabel.toLowerCase()}`;
 
   if (key === 'topSongsTime') {
     const rows = topSongsByTime(records, topN);
     const series = reverseLabelSeries(rows);
     const xHours = series.x.map(msToHours);
     return {
-      title: `Top ${topN} songs by listen time (${yearStart}-${yearEnd})`,
+      title: `Top ${topN} songs by listen time (${rangeLabel})`,
       data: [{
         type: 'bar',
         orientation: 'h',
@@ -91,7 +102,7 @@ export const buildChart = (
           : {}),
       }],
       layout: {
-        ...baseLayout(`Top ${topN} songs by listen time (${yearStart}-${yearEnd})`),
+        ...baseLayout(`Top ${topN} songs by listen time (${rangeLabel})`),
         margin: UNIFORM_MARGIN,
         xaxis: { title: 'Listening Time (hours)', tickformat: '.2f', automargin: true, gridcolor: THEME.ui.plotGrid },
         yaxis: shouldOverlayCategoryLabels ? { showticklabels: false, automargin: true, gridcolor: THEME.ui.plotGrid } : { gridcolor: THEME.ui.plotGrid, zeroline: false, automargin: true },
@@ -103,7 +114,7 @@ export const buildChart = (
     const rows = topSongsByCount(records, topN);
     const series = reverseLabelSeries(rows);
     return {
-      title: `Top ${topN} songs by listen count (${yearStart}-${yearEnd})`,
+      title: `Top ${topN} songs by listen count (${rangeLabel})`,
       data: [{
         type: 'bar',
         orientation: 'h',
@@ -116,19 +127,46 @@ export const buildChart = (
           : {}),
       }],
       layout: {
-        ...baseLayout(`Top ${topN} songs by listen count (${yearStart}-${yearEnd})`),
+        ...baseLayout(`Top ${topN} songs by listen count (${rangeLabel})`),
         margin: NO_X_LABEL_MARGIN,
         yaxis: shouldOverlayCategoryLabels ? { showticklabels: false, automargin: true, gridcolor: THEME.ui.plotGrid } : { gridcolor: THEME.ui.plotGrid, zeroline: false, automargin: true },
       },
     };
   }
 
+  if (key === 'topSongsFrequency') {
+    const rows = topSongsByFrequency(records, topN, frequencyWindowDays, startDate, endDate);
+    const series = reverseLabelSeries(rows);
+    return {
+      title: `Top ${topN} songs by frequency (${frequencyWindowLabel} window, ${rangeLabel})`,
+      data: [{
+        type: 'bar',
+        orientation: 'h',
+        x: series.x,
+        y: series.y,
+        marker: { color: THEME.charts.songsCount },
+        customdata: [...rows].reverse().map((r) => r.peakDate),
+        hovertemplate: '%{y}<br>%{x} listens<br>Peak center %{customdata|%Y-%m-%d}<extra></extra>',
+        ...(shouldOverlayCategoryLabels
+          ? { text: series.y, ...narrowBarLabelStyle(THEME.ui.buttonText) }
+          : {}),
+      }],
+      layout: {
+        ...baseLayout(`Top ${topN} songs by frequency (${frequencyWindowLabel} window, ${rangeLabel})`),
+        margin: UNIFORM_MARGIN,
+        xaxis: { title: windowAxisTitle, automargin: true, gridcolor: THEME.ui.plotGrid },
+        yaxis: shouldOverlayCategoryLabels ? { showticklabels: false, automargin: true, gridcolor: THEME.ui.plotGrid } : { gridcolor: THEME.ui.plotGrid, zeroline: false, automargin: true },
+      },
+    };
+  }
+
+
   if (key === 'topArtistsTime') {
     const rows = topArtistsByTime(records, topN);
     const series = reverseLabelSeries(rows);
     const xHours = series.x.map(msToHours);
     return {
-      title: `Top ${topN} artists by listen time (${yearStart}-${yearEnd})`,
+      title: `Top ${topN} artists by listen time (${rangeLabel})`,
       data: [{
         type: 'bar',
         orientation: 'h',
@@ -141,7 +179,7 @@ export const buildChart = (
           : {}),
       }],
       layout: {
-        ...baseLayout(`Top ${topN} artists by listen time (${yearStart}-${yearEnd})`),
+        ...baseLayout(`Top ${topN} artists by listen time (${rangeLabel})`),
         margin: UNIFORM_MARGIN,
         xaxis: { title: 'Listening Time (hours)', tickformat: '.2f', automargin: true, gridcolor: THEME.ui.plotGrid },
         yaxis: shouldOverlayCategoryLabels ? { showticklabels: false, automargin: true, gridcolor: THEME.ui.plotGrid } : { gridcolor: THEME.ui.plotGrid, zeroline: false, automargin: true },
@@ -153,7 +191,7 @@ export const buildChart = (
     const rows = topArtistsByCount(records, topN);
     const series = reverseLabelSeries(rows);
     return {
-      title: `Top ${topN} artists by listen count (${yearStart}-${yearEnd})`,
+      title: `Top ${topN} artists by listen count (${rangeLabel})`,
       data: [{
         type: 'bar',
         orientation: 'h',
@@ -166,19 +204,46 @@ export const buildChart = (
           : {}),
       }],
       layout: {
-        ...baseLayout(`Top ${topN} artists by listen count (${yearStart}-${yearEnd})`),
+        ...baseLayout(`Top ${topN} artists by listen count (${rangeLabel})`),
         margin: NO_X_LABEL_MARGIN,
         yaxis: shouldOverlayCategoryLabels ? { showticklabels: false, automargin: true, gridcolor: THEME.ui.plotGrid } : { gridcolor: THEME.ui.plotGrid, zeroline: false, automargin: true },
       },
     };
   }
 
+  if (key === 'topArtistsFrequency') {
+    const rows = topArtistsByFrequency(records, topN, frequencyWindowDays, startDate, endDate);
+    const series = reverseLabelSeries(rows);
+    return {
+      title: `Top ${topN} artists by frequency (${frequencyWindowLabel} window, ${rangeLabel})`,
+      data: [{
+        type: 'bar',
+        orientation: 'h',
+        x: series.x,
+        y: series.y,
+        marker: { color: THEME.charts.artistsCount },
+        customdata: [...rows].reverse().map((r) => r.peakDate),
+        hovertemplate: '%{y}<br>%{x} listens<br>Peak center %{customdata|%Y-%m-%d}<extra></extra>',
+        ...(shouldOverlayCategoryLabels
+          ? { text: series.y, ...narrowBarLabelStyle(THEME.ui.plotTitle) }
+          : {}),
+      }],
+      layout: {
+        ...baseLayout(`Top ${topN} artists by frequency (${frequencyWindowLabel} window, ${rangeLabel})`),
+        margin: UNIFORM_MARGIN,
+        xaxis: { title: windowAxisTitle, automargin: true, gridcolor: THEME.ui.plotGrid },
+        yaxis: shouldOverlayCategoryLabels ? { showticklabels: false, automargin: true, gridcolor: THEME.ui.plotGrid } : { gridcolor: THEME.ui.plotGrid, zeroline: false, automargin: true },
+      },
+    };
+  }
+
+
   if (key === 'topAlbumsTime') {
     const rows = topAlbumsByTime(records, topN);
     const series = reverseLabelSeries(rows);
     const xHours = series.x.map(msToHours);
     return {
-      title: `Top ${topN} albums by time (${yearStart}-${yearEnd})`,
+      title: `Top ${topN} albums by time (${rangeLabel})`,
       data: [{
         type: 'bar',
         orientation: 'h',
@@ -191,7 +256,7 @@ export const buildChart = (
           : {}),
       }],
       layout: {
-        ...baseLayout(`Top ${topN} albums by time (${yearStart}-${yearEnd})`),
+        ...baseLayout(`Top ${topN} albums by time (${rangeLabel})`),
         margin: UNIFORM_MARGIN,
         xaxis: { title: 'Listening Time (hours)', tickformat: '.2f', automargin: true, gridcolor: THEME.ui.plotGrid },
         yaxis: shouldOverlayCategoryLabels ? { showticklabels: false, automargin: true, gridcolor: THEME.ui.plotGrid } : { gridcolor: THEME.ui.plotGrid, zeroline: false, automargin: true },
@@ -203,7 +268,7 @@ export const buildChart = (
     const rows = topAlbumsByCount(records, topN);
     const series = reverseLabelSeries(rows);
     return {
-      title: `Top ${topN} albums by listen count (${yearStart}-${yearEnd})`,
+      title: `Top ${topN} albums by listen count (${rangeLabel})`,
       data: [{
         type: 'bar',
         orientation: 'h',
@@ -216,21 +281,48 @@ export const buildChart = (
           : {}),
       }],
       layout: {
-        ...baseLayout(`Top ${topN} albums by listen count (${yearStart}-${yearEnd})`),
+        ...baseLayout(`Top ${topN} albums by listen count (${rangeLabel})`),
         margin: NO_X_LABEL_MARGIN,
         yaxis: shouldOverlayCategoryLabels ? { showticklabels: false, automargin: true, gridcolor: THEME.ui.plotGrid } : { gridcolor: THEME.ui.plotGrid, zeroline: false, automargin: true },
       },
     };
   }
 
+  if (key === 'topAlbumsFrequency') {
+    const rows = topAlbumsByFrequency(records, topN, frequencyWindowDays, startDate, endDate);
+    const series = reverseLabelSeries(rows);
+    return {
+      title: `Top ${topN} albums by frequency (${frequencyWindowLabel} window, ${rangeLabel})`,
+      data: [{
+        type: 'bar',
+        orientation: 'h',
+        x: series.x,
+        y: series.y,
+        marker: { color: THEME.charts.albumsCount },
+        customdata: [...rows].reverse().map((r) => r.peakDate),
+        hovertemplate: '%{y}<br>%{x} listens<br>Peak center %{customdata|%Y-%m-%d}<extra></extra>',
+        ...(shouldOverlayCategoryLabels
+          ? { text: series.y, ...narrowBarLabelStyle(THEME.ui.plotTitle) }
+          : {}),
+      }],
+      layout: {
+        ...baseLayout(`Top ${topN} albums by frequency (${frequencyWindowLabel} window, ${rangeLabel})`),
+        margin: UNIFORM_MARGIN,
+        xaxis: { title: windowAxisTitle, automargin: true, gridcolor: THEME.ui.plotGrid },
+        yaxis: shouldOverlayCategoryLabels ? { showticklabels: false, automargin: true, gridcolor: THEME.ui.plotGrid } : { gridcolor: THEME.ui.plotGrid, zeroline: false, automargin: true },
+      },
+    };
+  }
+
+
   if (key === 'listeningByHour') {
     const rows = listeningByHour(records);
     const hoursPlayed = rows.map((r) => msToHours(r.value));
     return {
-      title: `Listening time by hour of day (${yearStart}-${yearEnd})`,
+      title: `Listening time by hour of day (${rangeLabel})`,
       data: [{ type: 'bar', x: rows.map((r) => r.hour), y: hoursPlayed, marker: { color: THEME.charts.hour }, hovertemplate: 'Hour %{x}<br>%{y:.2f} h<extra></extra>' }],
       layout: {
-        ...baseLayout(`Listening time by hour of day (${yearStart}-${yearEnd})`),
+        ...baseLayout(`Listening time by hour of day (${rangeLabel})`),
         margin: NO_X_LABEL_MARGIN,
         yaxis: { tickformat: '.2f', ticksuffix: ' h', automargin: true, gridcolor: THEME.ui.plotGrid },
         xaxis: { dtick: 2 },
@@ -242,38 +334,42 @@ export const buildChart = (
     const rows = listeningByWeekday(records);
     const hoursPlayed = rows.map((r) => msToHours(r.value));
     return {
-      title: `Listening time by weekday (${yearStart}-${yearEnd})`,
+      title: `Listening time by weekday (${rangeLabel})`,
       data: [{ type: 'bar', x: rows.map((r) => r.day), y: hoursPlayed, marker: { color: THEME.charts.weekday }, hovertemplate: '%{x}<br>%{y:.2f} h<extra></extra>' }],
       layout: {
-        ...baseLayout(`Listening time by weekday (${yearStart}-${yearEnd})`),
+        ...baseLayout(`Listening time by weekday (${rangeLabel})`),
         margin: NO_X_LABEL_MARGIN,
         yaxis: { tickformat: '.2f', ticksuffix: ' h', automargin: true, gridcolor: THEME.ui.plotGrid },
       },
     };
   }
 
-  if (key === 'skipRateByYear') {
-    const rows = skipRateByYear(records);
+  if (key === 'overallListeningFrequency') {
+    const points = overallListeningFrequency(records, frequencyWindowDays, startDate, endDate);
     return {
-      title: `Skip rate by year (${yearStart}-${yearEnd})`,
-      data: [{ type: 'scatter', mode: 'lines+markers', x: rows.map((r) => r.year), y: rows.map((r) => r.value), line: { color: THEME.charts.skip, width: 3 }, hovertemplate: 'Year %{x}<br>%{y:.2f}%<extra></extra>' }],
+      title: `Overall listening frequency (${frequencyWindowLabel} window, ${rangeLabel})`,
+      data: [{
+        type: 'scatter',
+        mode: 'lines',
+        x: points.map((p) => p.x),
+        y: points.map((p) => p.y),
+        line: { color: THEME.charts.hour, width: 2.5 },
+        hovertemplate: '%{x|%Y-%m-%d}<br>%{y} listens<extra></extra>',
+      }],
       layout: {
-        ...baseLayout(`Skip rate by year (${yearStart}-${yearEnd})`),
-        margin: NO_X_LABEL_MARGIN,
-        yaxis: {
-          range: [0, Math.max(100, ...rows.map((r) => r.value * 1.1))],
-          ticksuffix: '%',
-          automargin: true,
-          gridcolor: THEME.ui.plotGrid,
-        },
+        ...baseLayout(`Overall listening frequency (${frequencyWindowLabel} window, ${rangeLabel})`),
+        margin: UNIFORM_MARGIN,
+        xaxis: { title: 'Date', automargin: true, gridcolor: THEME.ui.plotGrid },
+        yaxis: { title: windowAxisTitle, automargin: true, gridcolor: THEME.ui.plotGrid },
       },
     };
   }
 
+
   if (key === 'songsCumulative') {
     const rows = cumulativeSongs(records, topN);
     return {
-      title: `Top ${topN} songs cumulative listen time (${yearStart}-${yearEnd})`,
+      title: `Top ${topN} songs cumulative listen time (${rangeLabel})`,
       data: rows.map((row, idx) => ({
         type: 'scatter',
         mode: 'lines',
@@ -284,7 +380,7 @@ export const buildChart = (
         hovertemplate: '%{fullData.name}<br>%{x}<br>%{y:.2f} h<extra></extra>',
       })),
       layout: {
-        ...baseLayout(`Top ${topN} songs cumulative listen time (${yearStart}-${yearEnd})`),
+        ...baseLayout(`Top ${topN} songs cumulative listen time (${rangeLabel})`),
         margin: NO_X_LABEL_MARGIN,
         legend: isMobileLayout
           ? {
@@ -312,7 +408,7 @@ export const buildChart = (
   if (key === 'artistsCumulative') {
     const rows = cumulativeArtists(records, topN);
     return {
-      title: `Top ${topN} artists cumulative listen time (${yearStart}-${yearEnd})`,
+      title: `Top ${topN} artists cumulative listen time (${rangeLabel})`,
       data: rows.map((row, idx) => ({
         type: 'scatter',
         mode: 'lines',
@@ -323,7 +419,7 @@ export const buildChart = (
         hovertemplate: '%{fullData.name}<br>%{x}<br>%{y:.2f} h<extra></extra>',
       })),
       layout: {
-        ...baseLayout(`Top ${topN} artists cumulative listen time (${yearStart}-${yearEnd})`),
+        ...baseLayout(`Top ${topN} artists cumulative listen time (${rangeLabel})`),
         margin: NO_X_LABEL_MARGIN,
         legend: isMobileLayout
           ? {
@@ -348,11 +444,113 @@ export const buildChart = (
     };
   }
 
+  if (key === 'albumsCumulative') {
+    const rows = cumulativeAlbums(records, topN);
+    return {
+      title: `Top ${topN} albums cumulative listen time (${rangeLabel})`,
+      data: rows.map((row, idx) => ({
+        type: 'scatter',
+        mode: 'lines',
+        x: row.points.map((p) => p.x),
+        y: row.points.map((p) => msToHours(p.y)),
+        name: row.label,
+        line: { color: THEME.charts.series[idx % THEME.charts.series.length], width: 2 },
+        hovertemplate: '%{fullData.name}<br>%{x}<br>%{y:.2f} h<extra></extra>',
+      })),
+      layout: {
+        ...baseLayout(`Top ${topN} albums cumulative listen time (${rangeLabel})`),
+        margin: NO_X_LABEL_MARGIN,
+        legend: isMobileLayout
+          ? {
+              orientation: 'h',
+              x: 0,
+              xanchor: 'left',
+              y: -0.34,
+              yanchor: 'top',
+              bgcolor: THEME.ui.legendFace,
+              bordercolor: THEME.ui.legendEdge,
+              borderwidth: 1,
+              font: { color: THEME.ui.plotTitle, size: 11 },
+            }
+          : {
+              bgcolor: THEME.ui.legendFace,
+              bordercolor: THEME.ui.legendEdge,
+              borderwidth: 1,
+              font: { color: THEME.ui.plotTitle },
+            },
+        yaxis: { tickformat: '.2f', ticksuffix: ' h', automargin: true, gridcolor: THEME.ui.plotGrid },
+      },
+    };
+  }
+
+  if (key === 'songsFrequency') {
+    const rows = songsFrequencySeries(records, topN, frequencyWindowDays, startDate, endDate);
+    return {
+      title: `Top ${topN} songs listening frequency (${frequencyWindowLabel} window, ${rangeLabel})`,
+      data: rows.map((row, idx) => ({
+        type: 'scatter',
+        mode: 'lines',
+        x: row.points.map((p) => p.x),
+        y: row.points.map((p) => p.y),
+        name: row.label,
+        line: { color: THEME.charts.series[idx % THEME.charts.series.length], width: 2 },
+        hovertemplate: '%{fullData.name}<br>%{x|%Y-%m-%d}<br>%{y} listens<extra></extra>',
+      })),
+      layout: {
+        ...baseLayout(`Top ${topN} songs listening frequency (${frequencyWindowLabel} window, ${rangeLabel})`),
+        margin: NO_X_LABEL_MARGIN,
+        yaxis: { title: windowAxisTitle, automargin: true, gridcolor: THEME.ui.plotGrid },
+      },
+    };
+  }
+
+  if (key === 'artistsFrequency') {
+    const rows = artistsFrequencySeries(records, topN, frequencyWindowDays, startDate, endDate);
+    return {
+      title: `Top ${topN} artists listening frequency (${frequencyWindowLabel} window, ${rangeLabel})`,
+      data: rows.map((row, idx) => ({
+        type: 'scatter',
+        mode: 'lines',
+        x: row.points.map((p) => p.x),
+        y: row.points.map((p) => p.y),
+        name: row.label,
+        line: { color: THEME.charts.series[idx % THEME.charts.series.length], width: 2 },
+        hovertemplate: '%{fullData.name}<br>%{x|%Y-%m-%d}<br>%{y} listens<extra></extra>',
+      })),
+      layout: {
+        ...baseLayout(`Top ${topN} artists listening frequency (${frequencyWindowLabel} window, ${rangeLabel})`),
+        margin: NO_X_LABEL_MARGIN,
+        yaxis: { title: windowAxisTitle, automargin: true, gridcolor: THEME.ui.plotGrid },
+      },
+    };
+  }
+
+  if (key === 'albumsFrequency') {
+    const rows = albumsFrequencySeries(records, topN, frequencyWindowDays, startDate, endDate);
+    return {
+      title: `Top ${topN} albums listening frequency (${frequencyWindowLabel} window, ${rangeLabel})`,
+      data: rows.map((row, idx) => ({
+        type: 'scatter',
+        mode: 'lines',
+        x: row.points.map((p) => p.x),
+        y: row.points.map((p) => p.y),
+        name: row.label,
+        line: { color: THEME.charts.series[idx % THEME.charts.series.length], width: 2 },
+        hovertemplate: '%{fullData.name}<br>%{x|%Y-%m-%d}<br>%{y} listens<extra></extra>',
+      })),
+      layout: {
+        ...baseLayout(`Top ${topN} albums listening frequency (${frequencyWindowLabel} window, ${rangeLabel})`),
+        margin: NO_X_LABEL_MARGIN,
+        yaxis: { title: windowAxisTitle, automargin: true, gridcolor: THEME.ui.plotGrid },
+      },
+    };
+  }
+
   const songs = topSongsByTime(records, topN).map((r) => ({ ...r, value: msToHours(r.value) }));
   const artists = topArtistsByTime(records, topN);
   const artistsHours = artists.map((r) => ({ ...r, value: msToHours(r.value) }));
   const hours = listeningByHour(records).map((r) => ({ ...r, value: msToHours(r.value) }));
-  const skip = skipRateByYear(records);
+  const overallFrequency = overallListeningFrequency(records, frequencyWindowDays, startDate, endDate);
 
   if (isMobileLayout) {
     const mobileSubplotTitleOffset = 0.006;
@@ -374,7 +572,7 @@ export const buildChart = (
     };
 
     return {
-      title: `Listening Insights Overview (${yearStart}-${yearEnd})`,
+      title: `Listening Insights Overview (${rangeLabel})`,
       data: [
         {
           type: 'bar',
@@ -394,7 +592,7 @@ export const buildChart = (
           orientation: 'h',
           x: [...artistsHours].reverse().map((r) => r.value),
           y: [...artistsHours].reverse().map((r) => r.label),
-          marker: { color: THEME.charts.artistsCount },
+          marker: { color: THEME.charts.artistsTime },
           xaxis: 'x2',
           yaxis: 'y2',
           text: [...artistsHours].reverse().map((r) => r.label),
@@ -414,20 +612,20 @@ export const buildChart = (
         },
         {
           type: 'scatter',
-          mode: 'lines+markers',
-          x: skip.map((r) => r.year),
-          y: skip.map((r) => r.value),
-          line: { color: THEME.charts.skip, width: 3 },
+          mode: 'lines',
+          x: overallFrequency.map((p) => p.x),
+          y: overallFrequency.map((p) => p.y),
+          line: { color: THEME.charts.skip, width: 2.5 },
           xaxis: 'x4',
           yaxis: 'y4',
-          hovertemplate: 'Year %{x}<br>%{y:.2f}%<extra></extra>',
+          hovertemplate: '%{x|%Y-%m-%d}<br>%{y} listens<extra></extra>',
           showlegend: false,
         },
       ],
       layout: {
-        ...baseLayout(`Listening Insights Overview (${yearStart}-${yearEnd})`),
+        ...baseLayout(`Listening Insights Overview (${rangeLabel})`),
         title: {
-          text: `Listening Insights Overview (${yearStart}-${yearEnd})`,
+          text: `Listening Insights Overview (${rangeLabel})`,
           x: 0.5,
           xanchor: 'center',
           font: { color: THEME.ui.plotTitle, size: PLOT_TITLE_FONT_SIZE },
@@ -438,23 +636,23 @@ export const buildChart = (
         xaxis: { title: { text: 'Hours', standoff: 2, font: { size: 10, color: THEME.ui.plotTick } }, tickformat: '.2f', tickfont: { size: 9 }, automargin: true, gridcolor: THEME.ui.plotGrid },
         xaxis2: { title: { text: 'Hours', standoff: 2, font: { size: 10, color: THEME.ui.plotTick } }, tickformat: '.2f', tickfont: { size: 9 }, automargin: true, gridcolor: THEME.ui.plotGrid },
         xaxis3: { title: { text: 'Hour of Day', standoff: 2, font: { size: 10, color: THEME.ui.plotTick } }, dtick: 2, tickfont: { size: 9 }, automargin: true, gridcolor: THEME.ui.plotGrid },
-        xaxis4: { title: { text: 'Year', standoff: 2, font: { size: 10, color: THEME.ui.plotTick } }, tickfont: { size: 9 }, automargin: true, gridcolor: THEME.ui.plotGrid },
+        xaxis4: { title: { text: 'Date', standoff: 2, font: { size: 10, color: THEME.ui.plotTick } }, tickfont: { size: 9 }, automargin: true, gridcolor: THEME.ui.plotGrid },
         yaxis: { showticklabels: false, automargin: true, gridcolor: THEME.ui.plotGrid, domain: mobileDomains.y1 },
         yaxis2: { showticklabels: false, automargin: true, gridcolor: THEME.ui.plotGrid, domain: mobileDomains.y2 },
         yaxis3: { tickformat: '.2f', automargin: true, gridcolor: THEME.ui.plotGrid, domain: mobileDomains.y3 },
-        yaxis4: { ticksuffix: '%', automargin: true, gridcolor: THEME.ui.plotGrid, domain: mobileDomains.y4 },
+        yaxis4: { title: { text: windowAxisTitle, font: { size: 10, color: THEME.ui.plotTick } }, automargin: true, gridcolor: THEME.ui.plotGrid, domain: mobileDomains.y4 },
         annotations: [
           { text: `Top ${topN} Songs by Time`, x: 0.5, y: mobileDomains.y1[1] + mobileSubplotTitleOffset, xref: 'paper', yref: 'paper', yanchor: 'bottom', showarrow: false, font: { color: THEME.ui.plotTitle, size: mobileSubplotTitleFontSize } },
           { text: `Top ${topN} Artists by Time`, x: 0.5, y: mobileDomains.y2[1] + mobileSubplotTitleOffset, xref: 'paper', yref: 'paper', yanchor: 'bottom', showarrow: false, font: { color: THEME.ui.plotTitle, size: mobileSubplotTitleFontSize } },
           { text: 'Listening by Hour', x: 0.5, y: mobileDomains.y3[1] + mobileSubplotTitleOffset, xref: 'paper', yref: 'paper', yanchor: 'bottom', showarrow: false, font: { color: THEME.ui.plotTitle, size: mobileSubplotTitleFontSize } },
-          { text: 'Skip Rate by Year', x: 0.5, y: mobileDomains.y4[1] + mobileSubplotTitleOffset, xref: 'paper', yref: 'paper', yanchor: 'bottom', showarrow: false, font: { color: THEME.ui.plotTitle, size: mobileSubplotTitleFontSize } },
+          { text: 'Overall Listening Frequency', x: 0.5, y: mobileDomains.y4[1] + mobileSubplotTitleOffset, xref: 'paper', yref: 'paper', yanchor: 'bottom', showarrow: false, font: { color: THEME.ui.plotTitle, size: mobileSubplotTitleFontSize } },
         ],
       },
     };
   }
 
   return {
-    title: `Listening Insights Overview (${yearStart}-${yearEnd})`,
+    title: `Listening Insights Overview (${rangeLabel})`,
     data: [
       {
         type: 'bar',
@@ -473,7 +671,7 @@ export const buildChart = (
         orientation: 'h',
         x: [...artistsHours].reverse().map((r) => r.value),
         y: [...artistsHours].reverse().map((r) => r.label),
-        marker: { color: THEME.charts.artistsCount },
+        marker: { color: THEME.charts.artistsTime },
         xaxis: 'x2',
         yaxis: 'y2',
         name: 'Top Artists',
@@ -492,18 +690,18 @@ export const buildChart = (
       },
       {
         type: 'scatter',
-        mode: 'lines+markers',
-        x: skip.map((r) => r.year),
-        y: skip.map((r) => r.value),
-        line: { color: THEME.charts.skip, width: 3 },
+        mode: 'lines',
+        x: overallFrequency.map((p) => p.x),
+        y: overallFrequency.map((p) => p.y),
+        line: { color: THEME.charts.skip, width: 2.5 },
         xaxis: 'x4',
         yaxis: 'y4',
-        hovertemplate: 'Year %{x}<br>%{y:.2f}%<extra></extra>',
+        hovertemplate: '%{x|%Y-%m-%d}<br>%{y} listens<extra></extra>',
         showlegend: false,
       },
     ],
     layout: {
-      ...baseLayout(`Listening Insights Overview (${yearStart}-${yearEnd})`),
+      ...baseLayout(`Listening Insights Overview (${rangeLabel})`),
       margin: UNIFORM_MARGIN,
       grid: { rows: 2, columns: 2, pattern: 'independent' },
       xaxis: {
@@ -521,7 +719,7 @@ export const buildChart = (
       yaxis: { automargin: true, gridcolor: THEME.ui.plotGrid, domain: [0.62, 1.0] },
       yaxis2: { automargin: true, gridcolor: THEME.ui.plotGrid, domain: [0.62, 1.0] },
       yaxis3: { title: 'Hours', tickformat: '.2f', automargin: true, gridcolor: THEME.ui.plotGrid, domain: [0.0, 0.34] },
-      yaxis4: { title: 'Skip Rate (%)', ticksuffix: '%', automargin: true, gridcolor: THEME.ui.plotGrid, domain: [0.0, 0.34] },
+      yaxis4: { title: windowAxisTitle, automargin: true, gridcolor: THEME.ui.plotGrid, domain: [0.0, 0.34] },
       annotations: [
         {
           text: `Top ${topN} Songs by Time`,
@@ -551,7 +749,7 @@ export const buildChart = (
           font: { color: THEME.ui.plotTitle, size: SUBPLOT_LABEL_FONT_SIZE },
         },
         {
-          text: 'Skip Rate by Year',
+          text: 'Overall Listening Frequency',
           x: 0.5,
           y: 1.2,
           xref: 'x4 domain',
@@ -568,15 +766,22 @@ export const labelForChart = (key: ChartKey): string => {
   const labels: Record<ChartKey, string> = {
     topSongsTime: 'Top Songs by Time',
     topSongsCount: 'Top Songs by Count',
+    topSongsFrequency: 'Top Songs by Frequency',
     topArtistsTime: 'Top Artists by Time',
     topArtistsCount: 'Top Artists by Count',
+    topArtistsFrequency: 'Top Artists by Frequency',
     topAlbumsTime: 'Top Albums by Time',
     topAlbumsCount: 'Top Albums by Count',
+    topAlbumsFrequency: 'Top Albums by Frequency',
     songsCumulative: 'Songs Cumulative',
     artistsCumulative: 'Artists Cumulative',
+    albumsCumulative: 'Albums Cumulative',
+    songsFrequency: 'Songs Frequency',
+    artistsFrequency: 'Artists Frequency',
+    albumsFrequency: 'Albums Frequency',
     listeningByHour: 'Listening by Hour',
     listeningByWeekday: 'Listening by Weekday',
-    skipRateByYear: 'Skip Rate by Year',
+    overallListeningFrequency: 'Overall Listening Frequency',
     insightsOverview: 'Insights Overview',
   };
   return labels[key];
