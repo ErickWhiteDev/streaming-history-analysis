@@ -13,6 +13,7 @@ type BuildChartWorkerRequest = {
   topN: number;
   frequencyWindowDays: number;
   frequencyWindowLabel: string;
+  includeSkippedSongs: boolean;
   isMobileLayout: boolean;
   isNarrowMobileLayout: boolean;
 };
@@ -43,6 +44,7 @@ self.onmessage = (event: MessageEvent<BuildChartWorkerRequest>) => {
       message.topN,
       message.frequencyWindowDays,
       message.frequencyWindowLabel,
+      message.includeSkippedSongs,
       message.isMobileLayout,
       message.isNarrowMobileLayout,
     );

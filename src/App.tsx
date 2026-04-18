@@ -20,6 +20,7 @@ type BuildChartWorkerRequest = {
   topN: number;
   frequencyWindowDays: number;
   frequencyWindowLabel: string;
+  includeSkippedSongs: boolean;
   isMobileLayout: boolean;
   isNarrowMobileLayout: boolean;
 };
@@ -140,10 +141,11 @@ type DateScrollPickerProps = {
   hardMax: string;
   softMin?: string;
   softMax?: string;
+  disabled?: boolean;
   onChange: (next: string) => void;
 };
 
-const DateScrollPicker = ({ value, hardMin, hardMax, softMin, softMax, onChange }: DateScrollPickerProps) => {
+const DateScrollPicker = ({ value, hardMin, hardMax, softMin, softMax, disabled = false, onChange }: DateScrollPickerProps) => {
   const parts = useMemo(() => parseIsoDate(value), [value]);
   const minParts = useMemo(() => parseIsoDate(hardMin), [hardMin]);
   const maxParts = useMemo(() => parseIsoDate(hardMax), [hardMax]);
@@ -199,7 +201,7 @@ const DateScrollPicker = ({ value, hardMin, hardMax, softMin, softMax, onChange 
 
   return (
     <div className="date-scroll-picker" aria-label="Date selector">
-      <select value={parts.month} onChange={(e) => update({ ...parts, month: Number(e.target.value) })}>
+      <select disabled={disabled} value={parts.month} onChange={(e) => update({ ...parts, month: Number(e.target.value) })}>
         {monthOptions.map((month) => (
           <option
             key={month}
@@ -216,14 +218,14 @@ const DateScrollPicker = ({ value, hardMin, hardMax, softMin, softMax, onChange 
           </option>
         ))}
       </select>
-      <select value={parts.day} onChange={(e) => update({ ...parts, day: Number(e.target.value) })}>
+      <select disabled={disabled} value={parts.day} onChange={(e) => update({ ...parts, day: Number(e.target.value) })}>
         {dayOptions.map((day) => (
           <option key={day} value={day} disabled={!inSoftRange(toDateKey({ year: parts.year, month: parts.month, day }))}>
             {day}
           </option>
         ))}
       </select>
-      <select value={parts.year} onChange={(e) => update({ ...parts, year: Number(e.target.value) })}>
+      <select disabled={disabled} value={parts.year} onChange={(e) => update({ ...parts, year: Number(e.target.value) })}>
         {yearOptions.map((year) => (
           <option
             key={year}
@@ -259,9 +261,13 @@ const App = () => {
 
   const [startDate, setStartDate] = useState(isoToday());
   const [endDate, setEndDate] = useState(isoToday());
+  const [allTime, setAllTime] = useState(false);
   const [topN, setTopN] = useState(5);
   const [frequencyWindow, setFrequencyWindow] = useState(FREQUENCY_WINDOWS[2].value);
+  const [includeSkippedSongs, setIncludeSkippedSongs] = useState(false);
   const [timezone, setTimezone] = useState(timezoneOptions[0]?.value ?? 'UTC');
+  const [filtersPanelCollapsed, setFiltersPanelCollapsed] = useState(false);
+  const [statsPanelCollapsed, setStatsPanelCollapsed] = useState(false);
 
   const [activeChartKey, setActiveChartKey] = useState<ChartKey | null>(null);
   const [activePlot, setActivePlot] = useState<PlotInstance | null>(null);
@@ -440,6 +446,7 @@ const App = () => {
       topN: depth,
       frequencyWindowDays: frequencyWindowSpec.days,
       frequencyWindowLabel: frequencyWindowSpec.unitLabel,
+      includeSkippedSongs,
       isMobileLayout,
       isNarrowMobileLayout,
     })
@@ -456,6 +463,7 @@ const App = () => {
   };
 
   const onChangeStartDate = (value: string) => {
+    if (allTime) return;
     if (!value) return;
     const nextStart = clampDate(value);
     setStartDate(nextStart);
@@ -466,6 +474,7 @@ const App = () => {
   };
 
   const onChangeEndDate = (value: string) => {
+    if (allTime) return;
     if (!value) return;
     const nextEnd = clampDate(value);
     setEndDate(nextEnd);
@@ -478,6 +487,12 @@ const App = () => {
   useEffect(() => {
     if (!timeframe.length) return;
 
+    if (allTime) {
+      if (startDate !== dateBounds.min) setStartDate(dateBounds.min);
+      if (endDate !== dateBounds.max) setEndDate(dateBounds.max);
+      return;
+    }
+
     const boundedStart = clampDate(startDate);
     const boundedEnd = clampDate(endDate);
     const normalizedStart = boundedStart <= boundedEnd ? boundedStart : boundedEnd;
@@ -485,7 +500,7 @@ const App = () => {
 
     if (normalizedStart !== startDate) setStartDate(normalizedStart);
     if (normalizedEnd !== endDate) setEndDate(normalizedEnd);
-  }, [timeframe, dateBounds.min, dateBounds.max, startDate, endDate]);
+  }, [timeframe, dateBounds.min, dateBounds.max, allTime, startDate, endDate]);
 
   useEffect(() => {
     if (!activeChartKey || !timeframe.length) return;
@@ -503,6 +518,7 @@ const App = () => {
       topN: depth,
       frequencyWindowDays: frequencyWindowSpec.days,
       frequencyWindowLabel: frequencyWindowSpec.unitLabel,
+      includeSkippedSongs,
       isMobileLayout,
       isNarrowMobileLayout,
     })
@@ -524,6 +540,7 @@ const App = () => {
     topN,
     frequencyWindowSpec.days,
     frequencyWindowSpec.unitLabel,
+    includeSkippedSongs,
     isMobileLayout,
     isNarrowMobileLayout,
   ]);
@@ -545,65 +562,129 @@ const App = () => {
   }
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell${filtersPanelCollapsed && statsPanelCollapsed ? ' expanded-plot' : ''}`}>
       <div className="controls-row">
-        <section className="panel filters-panel">
-          <h2>Analysis Filters</h2>
-          <p>Choose date range and statistic depth</p>
-          <div className="filters-grid">
-            <label>Start Date</label>
-            <DateScrollPicker
-              value={startDate}
-              hardMin={dateBounds.min}
-              hardMax={dateBounds.max}
-              softMax={endDate}
-              onChange={onChangeStartDate}
-            />
-            <label>End Date</label>
-            <DateScrollPicker
-              value={endDate}
-              hardMin={dateBounds.min}
-              hardMax={dateBounds.max}
-              softMin={startDate}
-              onChange={onChangeEndDate}
-            />
-            <label>Statistic Depth</label>
-            <input type="number" value={topN} min={1} max={50} onChange={(e) => setTopN(Number(e.target.value))} />
-            <label>Frequency Window</label>
-            <select value={frequencyWindow} onChange={(e) => setFrequencyWindow(e.target.value)}>
-              {FREQUENCY_WINDOWS.map((option) => (
-                <option value={option.value} key={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-            <label>Timezone</label>
-            <select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
-              {timezoneOptions.map((option) => (
-                <option value={option.value} key={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
+        <section className={`panel filters-panel${filtersPanelCollapsed ? ' panel-collapsed' : ''}`}>
+          <div className="panel-header-row">
+            <h2>Analysis Filters</h2>
+            <button
+              type="button"
+              className="panel-toggle"
+              aria-label={filtersPanelCollapsed ? 'Expand analysis filters' : 'Collapse analysis filters'}
+              onClick={() => setFiltersPanelCollapsed((prev) => !prev)}
+            >
+              <span className={`triangle-icon${filtersPanelCollapsed ? ' collapsed' : ''}`} aria-hidden="true" />
+            </button>
           </div>
-          <div className="helper">Loaded file: {fileName}</div>
-          <div className="helper">Listening hours, weekday, year, and cumulative timestamps use the selected timezone.</div>
-          <div className="helper">Frequency charts use a centered sliding window with the selected frequency window size.</div>
+          {!filtersPanelCollapsed ? (
+            <>
+              <p>Choose date range and statistic depth</p>
+              <div className="filters-groups">
+                <details className="filter-group" open>
+                  <summary>Time</summary>
+                  <div className="filters-grid">
+                    <label>Start Date</label>
+                    <DateScrollPicker
+                      value={startDate}
+                      hardMin={dateBounds.min}
+                      hardMax={dateBounds.max}
+                      softMax={endDate}
+                      disabled={allTime}
+                      onChange={onChangeStartDate}
+                    />
+                    <label>End Date</label>
+                    <DateScrollPicker
+                      value={endDate}
+                      hardMin={dateBounds.min}
+                      hardMax={dateBounds.max}
+                      softMin={startDate}
+                      disabled={allTime}
+                      onChange={onChangeEndDate}
+                    />
+                    <label>All Time</label>
+                    <label className="checkbox-field">
+                      <input
+                        type="checkbox"
+                        checked={allTime}
+                        onChange={(e) => {
+                          const checked = e.target.checked;
+                          setAllTime(checked);
+                          if (checked) {
+                            setStartDate(dateBounds.min);
+                            setEndDate(dateBounds.max);
+                          }
+                        }}
+                      />
+                      Use full dataset range
+                    </label>
+                    <label>Timezone</label>
+                    <select value={timezone} onChange={(e) => setTimezone(e.target.value)}>
+                      {timezoneOptions.map((option) => (
+                        <option value={option.value} key={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                    <label>Frequency Window</label>
+                    <select value={frequencyWindow} onChange={(e) => setFrequencyWindow(e.target.value)}>
+                      {FREQUENCY_WINDOWS.map((option) => (
+                        <option value={option.value} key={option.value}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </details>
+
+                <details className="filter-group" open>
+                  <summary>Other</summary>
+                  <div className="filters-grid">
+                    <label>Statistic Depth</label>
+                    <input type="number" value={topN} min={1} max={50} onChange={(e) => setTopN(Number(e.target.value))} />
+                    <label>Include Skipped Songs</label>
+                    <label className="checkbox-field">
+                      <input
+                        type="checkbox"
+                        checked={includeSkippedSongs}
+                        onChange={(e) => setIncludeSkippedSongs(e.target.checked)}
+                      />
+                      Include skipped tracks in all statistics
+                    </label>
+                  </div>
+                </details>
+              </div>
+              <div className="helper">Loaded file: {fileName}</div>
+              <div className="helper">Listening hours, weekday, year, and cumulative timestamps use the selected timezone.</div>
+              <div className="helper">Frequency charts use a centered sliding window with the selected frequency window size.</div>
+            </>
+          ) : null}
         </section>
 
-        <section className="panel button-panel">
-          <h2>Select Statistic</h2>
-          <div className="button-grid">
-            {CHART_KEYS.map((key) => (
-              <button
-                key={key}
-                className={`rounded-button${key === 'insightsOverview' ? ' rounded-button-emphasis insights-button' : ''}`}
-                onClick={() => renderChart(key)}
-              >
-                {labelForChart(key)}
-              </button>
-            ))}
+        <section className={`panel button-panel${statsPanelCollapsed ? ' panel-collapsed' : ''}`}>
+          <div className="panel-header-row">
+            <h2>Select Statistic</h2>
+            <button
+              type="button"
+              className="panel-toggle"
+              aria-label={statsPanelCollapsed ? 'Expand statistic selector' : 'Collapse statistic selector'}
+              onClick={() => setStatsPanelCollapsed((prev) => !prev)}
+            >
+              <span className={`triangle-icon${statsPanelCollapsed ? ' collapsed' : ''}`} aria-hidden="true" />
+            </button>
           </div>
+          {!statsPanelCollapsed ? (
+            <div className="button-grid">
+              {CHART_KEYS.map((key) => (
+                <button
+                  key={key}
+                  className={`rounded-button${key === 'insightsOverview' ? ' rounded-button-emphasis insights-button' : ''}`}
+                  onClick={() => renderChart(key)}
+                >
+                  {labelForChart(key)}
+                </button>
+              ))}
+            </div>
+          ) : null}
         </section>
       </div>
 

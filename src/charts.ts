@@ -76,10 +76,13 @@ export const buildChart = (
   topN: number,
   frequencyWindowDays: number,
   frequencyWindowLabel: string,
+  includeSkippedSongs = false,
   isMobileLayout = false,
   isNarrowMobileLayout = false,
 ): ChartSpec => {
-  const records = filterByDateRange(timeframe, startDate, endDate);
+  const records = filterByDateRange(timeframe, startDate, endDate).filter(
+    (record) => includeSkippedSongs || !record.skipped,
+  );
   const shouldOverlayCategoryLabels = isMobileLayout;
   const rangeLabel = `${startDate} to ${endDate}`;
   const windowAxisTitle = `Listens per ${frequencyWindowLabel.toLowerCase()}`;
@@ -95,7 +98,7 @@ export const buildChart = (
         orientation: 'h',
         x: xHours,
         y: series.y,
-        marker: { color: THEME.charts.songsTime },
+        marker: { color: THEME.charts.time },
         hovertemplate: '%{y}<br>%{x:.2f} h<extra></extra>',
         ...(shouldOverlayCategoryLabels
           ? { text: series.y, ...narrowBarLabelStyle(THEME.ui.buttonText) }
@@ -120,7 +123,7 @@ export const buildChart = (
         orientation: 'h',
         x: series.x,
         y: series.y,
-        marker: { color: THEME.charts.songsCount },
+        marker: { color: THEME.charts.count },
         hovertemplate: '%{y}<br>%{x} listens<extra></extra>',
         ...(shouldOverlayCategoryLabels
           ? { text: series.y, ...narrowBarLabelStyle(THEME.ui.buttonText) }
@@ -144,7 +147,7 @@ export const buildChart = (
         orientation: 'h',
         x: series.x,
         y: series.y,
-        marker: { color: THEME.charts.songsCount },
+        marker: { color: THEME.charts.frequency },
         customdata: [...rows].reverse().map((r) => r.peakDate),
         hovertemplate: '%{y}<br>%{x} listens<br>Peak center %{customdata|%Y-%m-%d}<extra></extra>',
         ...(shouldOverlayCategoryLabels
@@ -172,7 +175,7 @@ export const buildChart = (
         orientation: 'h',
         x: xHours,
         y: series.y,
-        marker: { color: THEME.charts.artistsTime },
+        marker: { color: THEME.charts.time },
         hovertemplate: '%{y}<br>%{x:.2f} h<extra></extra>',
         ...(shouldOverlayCategoryLabels
           ? { text: series.y, ...narrowBarLabelStyle(THEME.ui.buttonText) }
@@ -197,7 +200,7 @@ export const buildChart = (
         orientation: 'h',
         x: series.x,
         y: series.y,
-        marker: { color: THEME.charts.artistsCount },
+        marker: { color: THEME.charts.count },
         hovertemplate: '%{y}<br>%{x} listens<extra></extra>',
         ...(shouldOverlayCategoryLabels
           ? { text: series.y, ...narrowBarLabelStyle(THEME.ui.plotTitle) }
@@ -221,7 +224,7 @@ export const buildChart = (
         orientation: 'h',
         x: series.x,
         y: series.y,
-        marker: { color: THEME.charts.artistsCount },
+        marker: { color: THEME.charts.frequency },
         customdata: [...rows].reverse().map((r) => r.peakDate),
         hovertemplate: '%{y}<br>%{x} listens<br>Peak center %{customdata|%Y-%m-%d}<extra></extra>',
         ...(shouldOverlayCategoryLabels
@@ -249,7 +252,7 @@ export const buildChart = (
         orientation: 'h',
         x: xHours,
         y: series.y,
-        marker: { color: THEME.charts.albumsTime },
+        marker: { color: THEME.charts.time },
         hovertemplate: '%{y}<br>%{x:.2f} h<extra></extra>',
         ...(shouldOverlayCategoryLabels
           ? { text: series.y, ...narrowBarLabelStyle(THEME.ui.buttonText) }
@@ -274,7 +277,7 @@ export const buildChart = (
         orientation: 'h',
         x: series.x,
         y: series.y,
-        marker: { color: THEME.charts.albumsCount },
+        marker: { color: THEME.charts.count },
         hovertemplate: '%{y}<br>%{x} listens<extra></extra>',
         ...(shouldOverlayCategoryLabels
           ? { text: series.y, ...narrowBarLabelStyle(THEME.ui.plotTitle) }
@@ -298,7 +301,7 @@ export const buildChart = (
         orientation: 'h',
         x: series.x,
         y: series.y,
-        marker: { color: THEME.charts.albumsCount },
+        marker: { color: THEME.charts.frequency },
         customdata: [...rows].reverse().map((r) => r.peakDate),
         hovertemplate: '%{y}<br>%{x} listens<br>Peak center %{customdata|%Y-%m-%d}<extra></extra>',
         ...(shouldOverlayCategoryLabels
@@ -320,7 +323,7 @@ export const buildChart = (
     const hoursPlayed = rows.map((r) => msToHours(r.value));
     return {
       title: `Listening time by hour of day (${rangeLabel})`,
-      data: [{ type: 'bar', x: rows.map((r) => r.hour), y: hoursPlayed, marker: { color: THEME.charts.hour }, hovertemplate: 'Hour %{x}<br>%{y:.2f} h<extra></extra>' }],
+      data: [{ type: 'bar', x: rows.map((r) => r.hour), y: hoursPlayed, marker: { color: THEME.charts.time }, hovertemplate: 'Hour %{x}<br>%{y:.2f} h<extra></extra>' }],
       layout: {
         ...baseLayout(`Listening time by hour of day (${rangeLabel})`),
         margin: NO_X_LABEL_MARGIN,
@@ -335,7 +338,7 @@ export const buildChart = (
     const hoursPlayed = rows.map((r) => msToHours(r.value));
     return {
       title: `Listening time by weekday (${rangeLabel})`,
-      data: [{ type: 'bar', x: rows.map((r) => r.day), y: hoursPlayed, marker: { color: THEME.charts.weekday }, hovertemplate: '%{x}<br>%{y:.2f} h<extra></extra>' }],
+      data: [{ type: 'bar', x: rows.map((r) => r.day), y: hoursPlayed, marker: { color: THEME.charts.time }, hovertemplate: '%{x}<br>%{y:.2f} h<extra></extra>' }],
       layout: {
         ...baseLayout(`Listening time by weekday (${rangeLabel})`),
         margin: NO_X_LABEL_MARGIN,
@@ -353,7 +356,7 @@ export const buildChart = (
         mode: 'lines',
         x: points.map((p) => p.x),
         y: points.map((p) => p.y),
-        line: { color: THEME.charts.hour, width: 2.5 },
+        line: { color: THEME.charts.frequency, width: 2.5 },
         hovertemplate: '%{x|%Y-%m-%d}<br>%{y} listens<extra></extra>',
       }],
       layout: {
@@ -579,7 +582,7 @@ export const buildChart = (
           orientation: 'h',
           x: [...songs].reverse().map((r) => r.value),
           y: [...songs].reverse().map((r) => r.label),
-          marker: { color: THEME.charts.songsTime },
+          marker: { color: THEME.charts.time },
           xaxis: 'x',
           yaxis: 'y',
           text: [...songs].reverse().map((r) => r.label),
@@ -592,7 +595,7 @@ export const buildChart = (
           orientation: 'h',
           x: [...artistsHours].reverse().map((r) => r.value),
           y: [...artistsHours].reverse().map((r) => r.label),
-          marker: { color: THEME.charts.artistsTime },
+          marker: { color: THEME.charts.time },
           xaxis: 'x2',
           yaxis: 'y2',
           text: [...artistsHours].reverse().map((r) => r.label),
@@ -604,7 +607,7 @@ export const buildChart = (
           type: 'bar',
           x: hours.map((r) => r.hour),
           y: hours.map((r) => r.value),
-          marker: { color: THEME.charts.hour },
+          marker: { color: THEME.charts.time },
           xaxis: 'x3',
           yaxis: 'y3',
           hovertemplate: 'Hour %{x}<br>%{y:.2f} h<extra></extra>',
@@ -615,7 +618,7 @@ export const buildChart = (
           mode: 'lines',
           x: overallFrequency.map((p) => p.x),
           y: overallFrequency.map((p) => p.y),
-          line: { color: THEME.charts.skip, width: 2.5 },
+          line: { color: THEME.charts.frequency, width: 2.5 },
           xaxis: 'x4',
           yaxis: 'y4',
           hovertemplate: '%{x|%Y-%m-%d}<br>%{y} listens<extra></extra>',
@@ -659,7 +662,7 @@ export const buildChart = (
         orientation: 'h',
         x: [...songs].reverse().map((r) => r.value),
         y: [...songs].reverse().map((r) => r.label),
-        marker: { color: THEME.charts.songsTime },
+        marker: { color: THEME.charts.time },
         xaxis: 'x',
         yaxis: 'y',
         name: 'Top Songs',
@@ -671,7 +674,7 @@ export const buildChart = (
         orientation: 'h',
         x: [...artistsHours].reverse().map((r) => r.value),
         y: [...artistsHours].reverse().map((r) => r.label),
-        marker: { color: THEME.charts.artistsTime },
+        marker: { color: THEME.charts.time },
         xaxis: 'x2',
         yaxis: 'y2',
         name: 'Top Artists',
@@ -682,7 +685,7 @@ export const buildChart = (
         type: 'bar',
         x: hours.map((r) => r.hour),
         y: hours.map((r) => r.value),
-        marker: { color: THEME.charts.hour },
+        marker: { color: THEME.charts.time },
         xaxis: 'x3',
         yaxis: 'y3',
         hovertemplate: 'Hour %{x}<br>%{y:.2f} h<extra></extra>',
@@ -693,7 +696,7 @@ export const buildChart = (
         mode: 'lines',
         x: overallFrequency.map((p) => p.x),
         y: overallFrequency.map((p) => p.y),
-        line: { color: THEME.charts.skip, width: 2.5 },
+        line: { color: THEME.charts.frequency, width: 2.5 },
         xaxis: 'x4',
         yaxis: 'y4',
         hovertemplate: '%{x|%Y-%m-%d}<br>%{y} listens<extra></extra>',

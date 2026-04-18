@@ -1,17 +1,17 @@
 :root {
-  --window-bg: #1e1e2e;
-  --window-fg: #e0e0e0;
-  --panel-bg: #1f2937;
-  --plot-card-bg: #0f172a;
-  --text-muted: #94a3b8;
-  --text-label: #cbd5e1;
-  --control-bg: #334155;
-  --control-hover: #475569;
-  --field-bg: #0f172a;
-  --button-text: #f8fafc;
-  --save-normal: #d1d5db;
-  --save-hover: #f3f4f6;
-  --save-text: #111827;
+  --window-bg: #121212;
+  --window-fg: #ffffff;
+  --panel-bg: #181818;
+  --plot-card-bg: #101010;
+  --text-muted: #b3b3b3;
+  --text-label: #e5e5e5;
+  --control-bg: #242424;
+  --control-hover: #2f2f2f;
+  --field-bg: #101010;
+  --button-text: #ffffff;
+  --save-normal: #1ed760;
+  --save-hover: #20f266;
+  --save-text: #04150a;
 }
 
 * {
@@ -24,7 +24,7 @@ body,
   margin: 0;
   width: 100%;
   height: 100%;
-  font-family: "Segoe UI", sans-serif;
+  font-family: Circular, "Helvetica Neue", Helvetica, Arial, sans-serif;
   background: var(--window-bg);
   color: var(--window-fg);
 }
@@ -57,7 +57,7 @@ body,
 }
 
 .panel {
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--panel-bg);
   padding: 14px;
 }
@@ -66,6 +66,51 @@ body,
 .panel h2 {
   margin: 0 0 8px;
   font-size: 20px;
+}
+
+.panel-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.panel-header-row h2 {
+  margin: 0;
+}
+
+.panel-toggle {
+  appearance: none;
+  border: 1px solid #2c2c2c;
+  border-radius: 10px;
+  background: var(--field-bg);
+  width: 34px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+
+.panel-toggle:hover {
+  background: var(--control-hover);
+}
+
+.triangle-icon {
+  width: 0;
+  height: 0;
+  border-left: 6px solid transparent;
+  border-right: 6px solid transparent;
+  border-bottom: 8px solid var(--window-fg);
+  transition: transform 0.18s ease;
+}
+
+.triangle-icon.collapsed {
+  transform: rotate(180deg);
+}
+
+.panel-collapsed {
+  padding: 10px 14px;
 }
 
 .panel p,
@@ -99,6 +144,37 @@ body,
   margin-top: 12px;
 }
 
+.filters-groups {
+  margin-top: 10px;
+  display: grid;
+  gap: 10px;
+}
+
+.filter-group {
+  border: 1px solid #2a2a2a;
+  border-radius: 10px;
+  background: #141414;
+  overflow: hidden;
+}
+
+.filter-group > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: 10px 12px;
+  font-weight: 700;
+  color: var(--text-label);
+  border-bottom: 1px solid #222;
+}
+
+.filter-group > summary::-webkit-details-marker {
+  display: none;
+}
+
+.filter-group > .filters-grid {
+  margin-top: 0;
+  padding: 10px;
+}
+
 .filters-grid label {
   color: var(--text-label);
   font-weight: 700;
@@ -109,12 +185,20 @@ input[type='date'],
 select {
   background: var(--field-bg);
   color: var(--window-fg);
-  border: none;
+  border: 1px solid #2c2c2c;
   border-radius: 10px;
   padding: 10px 12px;
   font-size: 16px;
   font-weight: 700;
   width: 100%;
+}
+
+input[type='number']:focus,
+input[type='date']:focus,
+select:focus {
+  outline: 2px solid #1ed760;
+  outline-offset: 1px;
+  border-color: #1ed760;
 }
 
 input[type='date'] {
@@ -162,13 +246,13 @@ select {
 }
 
 .rounded-button-emphasis {
-  background: #3b82f6;
-  color: #eff6ff;
-  box-shadow: 0 0 0 2px #93c5fd inset;
+  background: #1ed760;
+  color: #04150a;
+  box-shadow: 0 0 0 2px #53f08a inset;
 }
 
 .rounded-button-emphasis:hover {
-  background: #2563eb;
+  background: #20f266;
 }
 
 .rounded-button,
@@ -194,6 +278,25 @@ select {
   background: var(--control-hover);
 }
 
+.checkbox-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--window-fg);
+  font-weight: 600;
+  background: var(--field-bg);
+  border: 1px solid #2c2c2c;
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.checkbox-field input[type='checkbox'] {
+  width: 16px;
+  height: 16px;
+  accent-color: #1ed760;
+  margin: 0;
+}
+
 .file-picker {
   display: inline-block;
   margin-top: 8px;
@@ -211,6 +314,12 @@ select {
   overflow: hidden;
   display: grid;
   place-items: center;
+}
+
+.app-shell.expanded-plot .plot-panel {
+  flex: 1 1 auto;
+  min-height: 0;
+  aspect-ratio: auto;
 }
 
 .plot-panel > div {
@@ -267,6 +376,11 @@ select {
     min-height: 0;
     flex: 0 0 auto;
     aspect-ratio: 16 / 10;
+  }
+
+  .app-shell.expanded-plot .plot-panel {
+    flex: 1 1 auto;
+    aspect-ratio: auto;
   }
 
   .plot-panel-mobile-insights {
