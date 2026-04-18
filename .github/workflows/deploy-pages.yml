@@ -36,6 +36,11 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Check Bundle Budget
+        env:
+          BUNDLE_BUDGET_BYTES: "6000000"
+        run: npm run bundle:check
+
       - name: Setup Pages
         uses: actions/configure-pages@v6
 

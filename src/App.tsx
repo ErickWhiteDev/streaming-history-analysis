@@ -1,13 +1,40 @@
-import { ChangeEvent, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react';
 import { loadSpotifyZip } from './dataLoader';
 import { buildTimezoneOptions } from './timezones';
 import { buildTimeframe } from './analytics';
-import { ChartKey, StreamRecord } from './types';
-import { buildChart, labelForChart } from './charts';
+import { ChartKey, StreamRecord, TimeframeRecord } from './types';
+import { labelForChart } from './chartLabels';
 
 type PlotInstance = {
   data: any[];
   layout: any;
+};
+
+type BuildChartWorkerRequest = {
+  id: number;
+  type: 'build-chart';
+  key: ChartKey;
+  timeframe: TimeframeRecord[];
+  startDate: string;
+  endDate: string;
+  topN: number;
+  frequencyWindowDays: number;
+  frequencyWindowLabel: string;
+  isMobileLayout: boolean;
+  isNarrowMobileLayout: boolean;
+};
+
+type BuildChartWorkerSuccess = {
+  id: number;
+  type: 'build-chart-result';
+  data: any[];
+  layout: any;
+};
+
+type BuildChartWorkerError = {
+  id: number;
+  type: 'build-chart-error';
+  error: string;
 };
 
 const CHART_KEYS: ChartKey[] = [
@@ -218,6 +245,13 @@ const DateScrollPicker = ({ value, hardMin, hardMax, softMin, softMax, onChange 
 };
 
 const App = () => {
+  const chartWorker = useMemo(() => new Worker(new URL('./chartBuildWorker.ts', import.meta.url), { type: 'module' }), []);
+  const workerRequestIdRef = useRef(0);
+  const workerPendingRef = useRef(
+    new Map<number, { resolve: (value: PlotInstance) => void; reject: (reason: Error) => void }>(),
+  );
+  const latestChartRequestTokenRef = useRef(0);
+
   const timezoneOptions = useMemo(() => buildTimezoneOptions(), []);
   const [records, setRecords] = useState<StreamRecord[] | null>(null);
   const [status, setStatus] = useState('Select your Spotify data ZIP to continue.');
@@ -234,6 +268,51 @@ const App = () => {
   const [PlotComponent, setPlotComponent] = useState<any>(null);
   const [isMobileLayout, setIsMobileLayout] = useState<boolean>(window.innerWidth < 1200);
   const [isNarrowMobileLayout, setIsNarrowMobileLayout] = useState<boolean>(window.innerWidth < 430);
+
+  useEffect(() => {
+    const onMessage = (event: MessageEvent<BuildChartWorkerSuccess | BuildChartWorkerError>) => {
+      const payload = event.data;
+      const pending = workerPendingRef.current.get(payload.id);
+      if (!pending) return;
+      workerPendingRef.current.delete(payload.id);
+
+      if (payload.type === 'build-chart-error') {
+        pending.reject(new Error(payload.error));
+        return;
+      }
+
+      pending.resolve({ data: payload.data, layout: payload.layout });
+    };
+
+    const onError = (event: ErrorEvent) => {
+      const message = event.message || 'Unknown chart worker error';
+      for (const pending of workerPendingRef.current.values()) {
+        pending.reject(new Error(message));
+      }
+      workerPendingRef.current.clear();
+    };
+
+    chartWorker.addEventListener('message', onMessage as EventListener);
+    chartWorker.addEventListener('error', onError as EventListener);
+
+    return () => {
+      chartWorker.removeEventListener('message', onMessage as EventListener);
+      chartWorker.removeEventListener('error', onError as EventListener);
+      for (const pending of workerPendingRef.current.values()) {
+        pending.reject(new Error('Chart worker terminated'));
+      }
+      workerPendingRef.current.clear();
+      chartWorker.terminate();
+    };
+  }, [chartWorker]);
+
+  const requestBuiltChart = (request: Omit<BuildChartWorkerRequest, 'id' | 'type'>): Promise<PlotInstance> => {
+    return new Promise((resolve, reject) => {
+      const id = ++workerRequestIdRef.current;
+      workerPendingRef.current.set(id, { resolve, reject });
+      chartWorker.postMessage({ id, type: 'build-chart', ...request } satisfies BuildChartWorkerRequest);
+    });
+  };
 
   useEffect(() => {
     const onResize = () => {
@@ -345,22 +424,35 @@ const App = () => {
   };
 
   const renderChart = (key: ChartKey) => {
+    setActiveChartKey(key);
+    if (!timeframe.length) return;
+
     const start = startDate <= endDate ? startDate : endDate;
     const end = startDate <= endDate ? endDate : startDate;
     const depth = Math.max(1, Math.min(50, topN));
-    const spec = buildChart(
+    const token = ++latestChartRequestTokenRef.current;
+
+    requestBuiltChart({
       key,
       timeframe,
-      start,
-      end,
-      depth,
-      frequencyWindowSpec.days,
-      frequencyWindowSpec.unitLabel,
+      startDate: start,
+      endDate: end,
+      topN: depth,
+      frequencyWindowDays: frequencyWindowSpec.days,
+      frequencyWindowLabel: frequencyWindowSpec.unitLabel,
       isMobileLayout,
       isNarrowMobileLayout,
-    );
-    setActiveChartKey(key);
-    setActivePlot({ data: spec.data, layout: spec.layout });
+    })
+      .then((plot) => {
+        if (token === latestChartRequestTokenRef.current) {
+          setActivePlot(plot);
+        }
+      })
+      .catch((error) => {
+        if (token === latestChartRequestTokenRef.current) {
+          setStatus(`Could not render chart: ${String(error)}`);
+        }
+      });
   };
 
   const onChangeStartDate = (value: string) => {
@@ -396,22 +488,34 @@ const App = () => {
   }, [timeframe, dateBounds.min, dateBounds.max, startDate, endDate]);
 
   useEffect(() => {
-    if (!activeChartKey) return;
+    if (!activeChartKey || !timeframe.length) return;
+
     const start = startDate <= endDate ? startDate : endDate;
     const end = startDate <= endDate ? endDate : startDate;
     const depth = Math.max(1, Math.min(50, topN));
-    const spec = buildChart(
-      activeChartKey,
+    const token = ++latestChartRequestTokenRef.current;
+
+    requestBuiltChart({
+      key: activeChartKey,
       timeframe,
-      start,
-      end,
-      depth,
-      frequencyWindowSpec.days,
-      frequencyWindowSpec.unitLabel,
+      startDate: start,
+      endDate: end,
+      topN: depth,
+      frequencyWindowDays: frequencyWindowSpec.days,
+      frequencyWindowLabel: frequencyWindowSpec.unitLabel,
       isMobileLayout,
       isNarrowMobileLayout,
-    );
-    setActivePlot({ data: spec.data, layout: spec.layout });
+    })
+      .then((plot) => {
+        if (token === latestChartRequestTokenRef.current) {
+          setActivePlot(plot);
+        }
+      })
+      .catch((error) => {
+        if (token === latestChartRequestTokenRef.current) {
+          setStatus(`Could not render chart: ${String(error)}`);
+        }
+      });
   }, [
     activeChartKey,
     timeframe,
