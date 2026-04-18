@@ -164,6 +164,25 @@ body,
   font-weight: 700;
   color: var(--text-label);
   border-bottom: 1px solid #222;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.filter-group > summary::after {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid var(--text-label);
+  border-bottom: 2px solid var(--text-label);
+  transform: rotate(45deg);
+  transition: transform 0.18s ease;
+  margin-left: 10px;
+  flex: 0 0 auto;
+}
+
+.filter-group[open] > summary::after {
+  transform: rotate(225deg);
 }
 
 .filter-group > summary::-webkit-details-marker {

@@ -268,6 +268,8 @@ const App = () => {
   const [timezone, setTimezone] = useState(timezoneOptions[0]?.value ?? 'UTC');
   const [filtersPanelCollapsed, setFiltersPanelCollapsed] = useState(false);
   const [statsPanelCollapsed, setStatsPanelCollapsed] = useState(false);
+  const [timeFiltersOpen, setTimeFiltersOpen] = useState(true);
+  const [otherFiltersOpen, setOtherFiltersOpen] = useState(true);
 
   const [activeChartKey, setActiveChartKey] = useState<ChartKey | null>(null);
   const [activePlot, setActivePlot] = useState<PlotInstance | null>(null);
@@ -328,6 +330,13 @@ const App = () => {
     window.addEventListener('resize', onResize);
     return () => window.removeEventListener('resize', onResize);
   }, []);
+
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      window.dispatchEvent(new Event('resize'));
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [timeFiltersOpen, otherFiltersOpen]);
 
   useEffect(() => {
     let isMounted = true;
@@ -580,7 +589,11 @@ const App = () => {
             <>
               <p>Choose date range and statistic depth</p>
               <div className="filters-groups">
-                <details className="filter-group" open>
+                <details
+                  className="filter-group"
+                  open={timeFiltersOpen}
+                  onToggle={(event) => setTimeFiltersOpen(event.currentTarget.open)}
+                >
                   <summary>Time</summary>
                   <div className="filters-grid">
                     <label>Start Date</label>
@@ -636,7 +649,11 @@ const App = () => {
                   </div>
                 </details>
 
-                <details className="filter-group" open>
+                <details
+                  className="filter-group"
+                  open={otherFiltersOpen}
+                  onToggle={(event) => setOtherFiltersOpen(event.currentTarget.open)}
+                >
                   <summary>Other</summary>
                   <div className="filters-grid">
                     <label>Statistic Depth</label>
