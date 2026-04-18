@@ -6,25 +6,23 @@ This is a TypeScript web app for analyzing Spotify listening history.
 
 [![Deploy To GitHub Pages](https://github.com/erickwhitedev/streaming-history-analysis/actions/workflows/deploy-pages.yml/badge.svg)](https://github.com/erickwhitedev/streaming-history-analysis/actions/workflows/deploy-pages.yml)
 
-GitHub Pages URL: `https://erickwhitedev.github.io/streaming-history-analysis/`
+GitHub Pages URL: [https://erickwhitedev.github.io/streaming-history-analysis/](https://erickwhitedev.github.io/streaming-history-analysis/)
 
 ## Features
 
-- Upload Spotify export `.zip` containing `Streaming_History_Audio_*.json`
-- Analysis filters:
-  - Start year
-  - End year
-  - Statistic depth (Top N)
-  - Timezone selector with UTC offsets
-- All chart actions from the desktop app:
-  - Top songs/artists/albums by time and count
-  - Cumulative songs/artists
-  - Listening by hour
-  - Listening by weekday
-  - Skip rate by year
-  - Insights overview
-- Save current plot as PNG
-- Matching dark-themed UI and light plot style
+- Upload a Spotify export `.zip` containing `Streaming_History_Audio_*.json`
+- Date-range analysis with an `All Time` toggle that snaps to the full dataset
+- Filter panel controls for timezone, statistic depth, and frequency-window sizing
+- Separate `Time` and `Other` filter groups, plus collapsible filter and statistic panels
+- Charts for:
+   - Top songs, artists, and albums by time, count, and frequency
+   - Cumulative songs, artists, and albums
+   - Listening by hour and weekday
+   - Overall listening frequency
+   - Insights overview
+- Save the current plot as PNG
+- Worker-backed chart generation for smoother rendering
+- Dark Spotify-style UI with compact top bars when the control panels are minimized
 
 ## Stack
 
@@ -32,10 +30,13 @@ GitHub Pages URL: `https://erickwhitedev.github.io/streaming-history-analysis/`
 - Plotly (`react-plotly.js`)
 - ZIP parsing with `jszip`
 - Timezone conversion with `luxon`
+- Chart building in a Web Worker
+- GitHub Pages deployment with GitHub Actions
+- Bundle budget check in CI (`npm run bundle:check`)
 
 ## Run
 
-1. Install Node.js 18+ (includes `npm`).
+1. Install a current Node.js LTS release (includes `npm`).
 2. Install dependencies:
 
    ```bash
@@ -53,3 +54,7 @@ GitHub Pages URL: `https://erickwhitedev.github.io/streaming-history-analysis/`
    ```bash
    npm run build
    ```
+
+## Deployment
+
+The app is deployed to GitHub Pages from the `main` branch through the workflow in `.github/workflows/deploy-pages.yml`.
